@@ -72,6 +72,23 @@ describe OmniAuth::Strategies::Identity do
       end
     end
 
+    context 'with failed validation' do
+      before do
+        MockIdentity.should_not_receive(:authenticate)
+      end
+
+      it 'should fail with :on_failed_validation' do
+        identity_options = {
+          on_validation: lambda{|env| false},
+          on_failed_validation: lambda{|env| [400, {'env' => env}, ["Failed validation!"]]}
+        }
+        set_app!(identity_options) do
+          post '/auth/identity/callback', :auth_key => 'john', :password => 'awesome'
+          last_response.body.should be_include("Failed validation")
+        end
+      end
+    end
+
     context 'with auth scopes' do
 
       it 'should evaluate and pass through conditions proc' do
@@ -111,9 +128,33 @@ describe OmniAuth::Strategies::Identity do
       end
     end
 
+    context 'with failed validation' do
+      let(:properties){ {
+        :name => 'Awesome Dude',
+        :email => 'awesome@example.com',
+        :password => 'face',
+        :password_confirmation => 'face'
+      } }
+
+      before do
+        MockIdentity.should_not_receive(:create)
+      end
+
+      it 'should fail with :on_failed_validation' do
+        identity_options = {
+          on_validation: lambda{|env| false},
+          on_failed_validation: lambda{|env| [400, {'env' => env}, ["Failed validation!"]]}
+        }
+        set_app!(identity_options) do
+          post '/auth/identity/register', properties
+          last_response.body.should be_include("Failed validation")
+        end
+      end
+    end
+
     context 'with invalid identity' do
       let(:properties) { {
-        :name => 'Awesome Dude', 
+        :name => 'Awesome Dude',
         :email => 'awesome@example.com',
         :password => 'NOT',
         :password_confirmation => 'MATCHING'
