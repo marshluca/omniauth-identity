@@ -10,6 +10,8 @@ module OmniAuth
       option :on_login, nil
       option :on_registration, nil
       option :on_failed_registration, nil
+      option :on_validation, nil
+      option :on_failed_validation, nil
       option :locate_conditions, lambda{|req| {model.auth_key => req['auth_key']} }
 
       def request_phase
@@ -28,6 +30,16 @@ module OmniAuth
       end
 
       def callback_phase
+        if options[:on_validation] && !@validated
+          unless options[:on_validation].call(env: self.env)
+            if options[:on_failed_validation]
+              return options[:on_failed_validation].call(self.env)
+            else
+              return request_phase
+            end
+          end
+        end
+
         return fail!(:invalid_credentials) unless identity
         super
       end
@@ -59,6 +71,18 @@ module OmniAuth
       end
 
       def registration_phase
+        if options[:on_validation]
+          unless options[:on_validation].call(env: self.env)
+            if options[:on_failed_validation]
+              return options[:on_failed_validation].call(self.env)
+            else
+              return registration_form
+            end
+          else
+            @validated = true
+          end
+        end
+
         attributes = (options[:fields] + [:password, :password_confirmation]).inject({}){|h,k| h[k] = request[k.to_s]; h}
         @identity = model.create(attributes)
         if @identity.persisted?
